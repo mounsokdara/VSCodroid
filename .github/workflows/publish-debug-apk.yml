@@ -1,5 +1,8 @@
 name: Publish debug APK
 
+# Publishes the debug-apk artifact from a green Build run to the
+# debug-latest GitHub Release so it can be downloaded from the Releases page.
+
 on:
   workflow_run:
     workflows: [Build]
