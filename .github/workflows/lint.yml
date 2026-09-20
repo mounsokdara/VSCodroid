@@ -16,8 +16,89 @@ on:
     branches: [main]
   push:
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: lint-${{ github.ref }}
   cancel-in-progress: true
+
+# Read by default. Nothing here publishes, and nothing here reaches the network
+# except the Gradle and Node toolchain downloads. Without this block the token's
+# scope is whatever the repository's default workflow permissions happen to be,
+# which is a setting outside this file and outside review. release.yml has said
+# this since it was written.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Android Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history, for the document-date check below and nothing else.
+          # `git log -1 -- <file>` in checkout's default single-commit clone
+          # reports the tip commit for every file it can see, so that check
+          # cannot answer here without this and refuses to guess. 58 MiB of
+          # pack, measured 2026-08-22, against a release that used to be the
+          # first place anybody found out.
+          fetch-depth: 0
+          # Nothing here pushes, and reading the local history the line above
+          # fetches needs no credential. A persisted token would be readable by
+          # `./gradlew lint` and every gate below it for the length of the job.
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      # No api-level here, and that is deliberate rather than an omission.
+      # android-actions/setup-android has never declared one: its inputs are
+      # cmdline-tools-version, accept-android-sdk-licenses,
+      # log-accepted-android-sdk-licenses and packages. Passing api-level: 36
+      # produced "Unexpected input(s) 'api-level'" on every run and set nothing,
+      # for as long as it was there. The platform this build needs is fetched by
+      # Gradle from compileSdk, which is why removing it changes no behaviour.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          # The action's default also asks for `tools`, which Google's SDK
+          # repository no longer lists, so sdkmanager exits 1 and the job stops.
+          packages: platform-tools
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          # Pinned to the open-source implementation, not left to the default.
+          #
+          # gradle/actions v6 added cache-provider and defaults it to 'enhanced',
+          # which the action's own description calls "the full-featured commercial
+          # caching service (gradle-actions-caching)"; 'basic' is "a simple
+          # open-source caching implementation based on GitHub Actions cache".
+          # v4 declared no such input, so the version bump moved every Gradle job
+          # here onto the commercial one without anything in this repository
+          # saying so, including the job that holds the signing keystore.
+          #
+          # This project drops dependencies over their licences (Berkeley DB went
+          # for being AGPL) and publishes a source offer covering 39 components.
+          # Taking on a commercial service silently is not a decision a dependency
+          # bump gets to make here. Naming the value also means a later default
+          # change cannot move it again.
+          cache-provider: basic
+
+      # For the JavaScript self-checks below. Pinned rather than left to
+      # whatever the runner image happens to carry, and pinned to the major
+      # the APK ships: the code under test runs on the device under the
+      # Termux nodejs-lts that build-native-addons.sh names in NODE_VERSION,
+      # and nowhere else, so a self-check green on another major says nothing
+      # about the device. It ran on 20 while every APK carried 24, which
+      # check-build-steps.py now refuses.
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31e5020 # v7.0.0
+        with:
+          node-version: "24"
