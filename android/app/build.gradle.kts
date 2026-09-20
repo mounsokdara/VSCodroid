@@ -54,7 +54,7 @@ android {
 
     defaultConfig {
         applicationId = "com.vscodroid"
-        minSdk = 30
+        minSdk = 33
         @Suppress("OldTargetApi")
         targetSdk = 36
         versionCode = 15
