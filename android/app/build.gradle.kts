@@ -146,6 +146,7 @@ android {
     sourceSets["main"].assets.srcDir(bundleNotices)
 
     lint {
+        // The 3 issues recorded in lint-baseline.xml are filtered out of every report.
         abortOnError = true
         baseline = file("lint-baseline.xml")
     }
