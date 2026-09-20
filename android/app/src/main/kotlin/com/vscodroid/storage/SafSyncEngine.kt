@@ -10,9 +10,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.concurrent.thread
+
+
+/** InputStream.readAtMost(buf, off, len) is API 33. This matches it on API 30. */
+private fun InputStream.readAtMost(buffer: ByteArray, offset: Int, length: Int): Int {
+    var total = 0
+    while (total < length) {
+        val n = read(buffer, offset + total, length - total)
+        if (n <= 0) break
+        total += n
+    }
+    return total
+}
 
 /**
  * Bidirectional sync engine between SAF content:// URIs and local mirror directories.
@@ -2042,7 +2055,7 @@ class SafSyncEngine(private val context: Context) {
                     val a = ByteArray(COPY_BUFFER_SIZE)
                     val b = ByteArray(COPY_BUFFER_SIZE)
                     while (true) {
-                        val read = device.readNBytes(a, 0, a.size)
+                        val read = device.readAtMost(a, 0, a.size)
                         // The document ended while the two still agreed, so it is
                         // a prefix. Strict needs one more byte in the mirror, and
                         // it is asked of the stream rather than of
@@ -2052,7 +2065,7 @@ class SafSyncEngine(private val context: Context) {
                         if (read == 0) return@use mirror.read() != -1
                         // The mirror ran out first, so the document holds more
                         // than any prefix of it: something else put it there.
-                        if (mirror.readNBytes(b, 0, read) != read) return@use false
+                        if (mirror.readAtMost(b, 0, read) != read) return@use false
                         if (!java.util.Arrays.equals(a, 0, read, b, 0, read)) return@use false
                     }
                     @Suppress("UNREACHABLE_CODE") false
@@ -2103,8 +2116,8 @@ class SafSyncEngine(private val context: Context) {
                     val a = ByteArray(COPY_BUFFER_SIZE)
                     val b = ByteArray(COPY_BUFFER_SIZE)
                     while (true) {
-                        val read = device.readNBytes(a, 0, a.size)
-                        val same = mirror.readNBytes(b, 0, b.size)
+                        val read = device.readAtMost(a, 0, a.size)
+                        val same = mirror.readAtMost(b, 0, b.size)
                         if (read != same) return@use false
                         if (read == 0) return@use true
                         // Only the bytes this chunk filled. Comparing the whole buffer
@@ -4575,8 +4588,8 @@ class SafSyncEngine(private val context: Context) {
                         val one = ByteArray(COPY_BUFFER_SIZE)
                         val two = ByteArray(COPY_BUFFER_SIZE)
                         while (true) {
-                            val read = left.readNBytes(one, 0, one.size)
-                            if (read != right.readNBytes(two, 0, two.size)) return false
+                            val read = left.readAtMost(one, 0, one.size)
+                            if (read != right.readAtMost(two, 0, two.size)) return false
                             if (read == 0) return true
                             // Only the bytes this chunk filled, for the reason
                             // [deviceMatchesMirror] gives: the previous, longer chunk's
