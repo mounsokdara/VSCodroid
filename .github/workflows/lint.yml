@@ -1,1 +1,23 @@
-PLACEHOLDER_LINT
+name: Lint
+
+# Both triggers, because the pull request is not how most code arrives here.
+# Measured 2026-08-16: of 362 first-parent commits since v1.0.0, 11 are merges,
+# so 351 landed straight on main and reached none of the gates below. The one
+# that made this concrete is the patch-parse step: a prose edit inside a patch
+# body that breaks its hunk header passes every other check in the repository,
+# and without a push trigger it surfaced only in build-vscode-oss.yml, which is
+# manual and runs once per VS Code bump. The diagnosis arrived weeks after the
+# commit.
+#
+# Safe on push because every step below reads committed sources or the stubs it
+# creates itself: no secrets, no downloaded assets, and no github.event field.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
