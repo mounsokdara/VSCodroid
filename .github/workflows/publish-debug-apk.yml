@@ -33,11 +33,13 @@ jobs:
         with:
           tag_name: debug-latest
           name: Debug APK (Android 11+)
-          prerelease: true
+          prerelease: false
           make_latest: true
           fail_on_unmatched_files: true
           body: |
             Sideload debug APK from the latest successful Build on `main`.
+
+            Direct download: https://github.com/mounsokdara/VSCodroid/releases/download/debug-latest/app-debug.apk
 
             - minSdk 30 (Android 11 and newer)
             - arm64-v8a
